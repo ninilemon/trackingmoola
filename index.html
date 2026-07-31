@@ -27,10 +27,10 @@
   .owed-grid{grid-template-columns:1fr 130px 150px}
   .ogroup{border-bottom:1px solid var(--line);padding:12px 0}
   .ogroup:last-child{border-bottom:0}
-  .ohead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+  .ohead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
   .operson{font-weight:600;font-size:15px}
   .osub{font-family:var(--mono);font-weight:600;font-size:15px;color:var(--in)}
-  .oitem{display:grid;grid-template-columns:auto 1fr auto auto;gap:9px;align-items:center;padding:5px 0 5px 2px}
+  .oitem{display:grid;grid-template-columns:auto 1fr auto auto auto;gap:9px;align-items:center;padding:3px 0 3px 2px}
   .oitem .odate{font-family:var(--mono);font-size:12px;color:var(--muted)}
   .oitem .onote{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .oitem .oamt{font-family:var(--mono);font-weight:600;font-size:14px}
@@ -159,6 +159,7 @@
     <div id="bal" class="balance num">$0.00</div>
     <div class="hero-stats">
       <div class="stat"><div class="k">In accounts</div><div id="tassets" class="v in num">$0.00</div></div>
+      <div class="stat"><div class="k">Money in</div><div id="tmoneyin" class="v in num">$0.00</div></div>
       <div class="stat"><div class="k">Card debt</div><div id="tdebt" class="v out num">$0.00</div></div>
     </div>
     <div class="bar"><div id="segin" class="seg-in" style="width:0"></div><div id="segout" class="seg-out" style="width:0"></div></div>
@@ -510,12 +511,13 @@ function renderOwed(){
   list.innerHTML=names.map(name=>{
     const items=groups[name].slice().sort((a,b)=> b.date.localeCompare(a.date));
     const sub=items.filter(o=>!o.paid).reduce((s,o)=>s+o.amount,0);
+    const many=items.length>1;
     return `<div class="ogroup">
-      <div class="ohead"><span class="operson">${esc(name)}</span><span class="osub">${sub>0?fmt(sub):'settled up'}</span></div>
+      <div class="ohead"><span class="operson">${esc(name)}</span><span class="osub">${sub>0?fmt(sub):'Settled up'}</span></div>
       ${items.map(o=>`<div class="oitem ${o.paid?'paid':''}">
         <span class="odate">${o.date}</span>
         <span class="onote">${o.note?esc(o.note):'—'}</span>
-        <span class="oamt">${fmt(o.amount)}</span>
+        ${many?`<span class="oamt">${fmt(o.amount)}</span>`:''}
         <button class="pay" onclick="togglePaid('${o.id}')">${o.paid?'Paid ✓':'Mark paid'}</button>
         <button class="del" title="Delete" onclick="delOwed('${o.id}')">×</button>
       </div>`).join('')}
@@ -564,14 +566,15 @@ function render(){
   const tin=view.filter(t=>t.type==='in').reduce((s,t)=>s+t.amount,0);
   const tout=view.filter(t=>t.type==='out').reduce((s,t)=>s+t.amount,0);
 
-  // net balance = money in accounts − credit card debt
+  // net balance = money in accounts + repaid IOUs − credit card debt
   const assets=state.accounts.reduce((s,a)=>s+(+a.balance||0),0);
   const debt=state.debts.reduce((s,d)=>s+(+d.balance||0),0);
-  const net=assets-debt;
+  const repaid=state.owed.filter(o=>o.paid).reduce((s,o)=>s+o.amount,0);
+  const net=assets+repaid-debt;
   $('bal').textContent=fmt(net); $('bal').classList.toggle('neg',net<0);
-  $('tassets').textContent=fmt(assets); $('tdebt').textContent=fmt(debt);
-  const tot=assets+debt||1;
-  $('segin').style.width=(assets/tot*100)+'%'; $('segout').style.width=(debt/tot*100)+'%';
+  $('tassets').textContent=fmt(assets); $('tmoneyin').textContent=fmt(repaid); $('tdebt').textContent=fmt(debt);
+  const inSide=assets+repaid, tot=inSide+debt||1;
+  $('segin').style.width=(inSide/tot*100)+'%'; $('segout').style.width=(debt/tot*100)+'%';
 
   // logged flow, scoped to the ledger filter
   const nf=tin-tout;
